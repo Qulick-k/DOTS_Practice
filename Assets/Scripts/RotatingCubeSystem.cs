@@ -19,25 +19,58 @@ public partial struct RotatingCubeSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        //使用foreach去SystemAPI.Query裡面尋找有掛載ratate speed component的entities，以及為了能夠旋轉物件也需要尋找有掛載LocalTransform的entities
-        //在Query裡面找特定的types，像是RotateSpeed。在執行ECS時需要明確表明我們想要"讀寫"或是只想要"唯讀"，因此需要在表明的types前面多加RefRW或是RefRO代表"讀寫"或是"唯讀"
-        //由於LocalTransform內的參數需要被改寫，所以使用RefRW；而RotateSpeed純粹只需要讀取裡面的參數，所以使用RefRO
-        foreach ((RefRW<LocalTransform> locakTransform, RefRO<RotateSpeed> rotateSpeed) in SystemAPI.Query<RefRW<LocalTransform>, RefRO<RotateSpeed>>())
-        {
+        ////使用foreach去SystemAPI.Query裡面尋找有掛載ratate speed component的entities，以及為了能夠旋轉物件也需要尋找有掛載LocalTransform的entities
+        ////在Query裡面找特定的types，像是RotateSpeed。在執行ECS時需要明確表明我們想要"讀寫"或是只想要"唯讀"，因此需要在表明的types前面多加RefRW或是RefRO代表"讀寫"或是"唯讀"
+        ////由於LocalTransform內的參數需要被改寫，所以使用RefRW；而RotateSpeed純粹只需要讀取裡面的參數，所以使用RefRO
+        //foreach ((RefRW<LocalTransform> localTransform, RefRO<RotateSpeed> rotateSpeed) in SystemAPI.Query<RefRW<LocalTransform>, RefRO<RotateSpeed>>())
+        //{
 
-            //寫一個爛code，測試有無Burst的差異。編譯器可能夠聰明把這段爛code自動移除掉。
+        //    //寫一個爛code，測試有無Burst的差異。編譯器可能夠聰明把這段爛code自動移除掉。
+        //    float power = 1f;
+        //    for(int i = 0; i < 100000; i++)
+        //    {
+        //        power *= 2f;
+        //        power /= 2f;
+        //    }
+
+        //    //現在foreach都找到我們指定的component了，所以我們現在來set up物件的旋轉
+        //    //進入locakTransform找到ValueRW這個能讀寫的變數，在進入locakTransform找到ValueRO這個"唯讀"的變數，在裡面選擇RotateY()方法。
+        //    //RotateY()方法內的參數，透過進入rotateSpeed找到ValueRO的value來抓取數值，並且透過SystemAPI.Time.DeltaTime，讓數值隨著frame rate變化
+        //    //最後當作參數傳進RotateY()，RotateY()運行完後再回傳給locakTransform.ValueRW。
+        //    localTransform.ValueRW = localTransform.ValueRO.RotateY(rotateSpeed.ValueRO.value * SystemAPI.Time.DeltaTime);
+        //}
+
+        //為了讓deltaTime存取數值，new一個job，調用 SystemAPI.Time.DeltaTime把數值賦予給deltaTime。最後在傳回rotatingCubeJob
+        //接著讓rotatingCubeJob執行ScheduleParallel()，也可以使用Run()來debug但不建議，因為會馬上在主執行緒運作。
+        RotatingCubeJob rotatingCubeJob = new RotatingCubeJob
+        {
+            deltaTime = SystemAPI.Time.DeltaTime
+        };
+        rotatingCubeJob.ScheduleParallel();
+    }
+
+
+    //由於使用Burst仍然只在Main Thread上面運作，而無法多執行緒運作，因此需要Job協助
+    //設置RotatingCubeJob腳本繼承IJobEntity來讓Entity運作，並一樣使用partial和struct，盡量不繼承IJobParallelFor
+    //讓Job和BurstCompile結合，會跑出最好的效果。
+    [BurstCompile] 
+    public partial struct RotatingCubeJob : IJobEntity
+    {
+        public float deltaTime;
+
+        //新增一個新的Execute()方法，由於參數來源就兩個，LocalTransform和RotateSpeed，前綴用ref能把參考的數值改寫，in則是不能把參考的數值改寫
+        public void Execute(ref LocalTransform localTransform, in RotateSpeed rotateSpeed)
+        {
             float power = 1f;
-            for(int i = 0; i < 100000; i++)
+            for (int i = 0; i < 100000; i++)
             {
                 power *= 2f;
                 power /= 2f;
             }
 
-            //現在foreach都找到我們指定的component了，所以我們現在來set up物件的旋轉
-            //進入locakTransform找到ValueRW這個能讀寫的變數，在進入locakTransform找到ValueRO這個"唯讀"的變數，在裡面選擇RotateY()方法。
-            //RotateY()方法內的參數，透過進入rotateSpeed找到ValueRO的value來抓取數值，並且透過SystemAPI.Time.DeltaTime，讓數值隨著frame rate變化
-            //最後當作參數傳進RotateY()，RotateY()運行完後再回傳給locakTransform.ValueRW。
-            locakTransform.ValueRW = locakTransform.ValueRO.RotateY(rotateSpeed.ValueRO.value * SystemAPI.Time.DeltaTime);
+            //在job裡面變數前面就不需要RefRW和RefRO了
+            //由於IJobEntity不允許使用SystemAPI，因此設置一個公有變數deltaTime，在OnUpdate()裡面把數值傳給deltaTime
+            localTransform = localTransform.RotateY(rotateSpeed.value * deltaTime * power);
         }
     }
 }

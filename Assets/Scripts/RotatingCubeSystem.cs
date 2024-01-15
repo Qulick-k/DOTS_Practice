@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Burst;
 using Unity.Entities;
 using Unity.Transforms;
 using UnityEngine;
@@ -15,6 +16,7 @@ public partial struct RotatingCubeSystem : ISystem
         state.RequireForUpdate<RotateSpeed>();
     }
 
+    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         //使用foreach去SystemAPI.Query裡面尋找有掛載ratate speed component的entities，以及為了能夠旋轉物件也需要尋找有掛載LocalTransform的entities
@@ -22,6 +24,15 @@ public partial struct RotatingCubeSystem : ISystem
         //由於LocalTransform內的參數需要被改寫，所以使用RefRW；而RotateSpeed純粹只需要讀取裡面的參數，所以使用RefRO
         foreach ((RefRW<LocalTransform> locakTransform, RefRO<RotateSpeed> rotateSpeed) in SystemAPI.Query<RefRW<LocalTransform>, RefRO<RotateSpeed>>())
         {
+
+            //寫一個爛code，測試有無Burst的差異。編譯器可能夠聰明把這段爛code自動移除掉。
+            float power = 1f;
+            for(int i = 0; i < 100000; i++)
+            {
+                power *= 2f;
+                power /= 2f;
+            }
+
             //現在foreach都找到我們指定的component了，所以我們現在來set up物件的旋轉
             //進入locakTransform找到ValueRW這個能讀寫的變數，在進入locakTransform找到ValueRO這個"唯讀"的變數，在裡面選擇RotateY()方法。
             //RotateY()方法內的參數，透過進入rotateSpeed找到ValueRO的value來抓取數值，並且透過SystemAPI.Time.DeltaTime，讓數值隨著frame rate變化

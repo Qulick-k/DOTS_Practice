@@ -19,6 +19,10 @@ public partial struct RotatingCubeSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        //如果要停止這個腳本的運作的話，在這個方法裡面，把state.Enabled修改為false，並且return即可
+        state.Enabled = false;
+        return;
+
         //使用foreach去SystemAPI.Query裡面尋找有掛載ratate speed component的entities，以及為了能夠旋轉物件也需要尋找有掛載LocalTransform的entities
         //在Query裡面找特定的types，像是RotateSpeed。在執行ECS時需要明確表明我們想要"讀寫"或是只想要"唯讀"，因此需要在表明的types前面多加RefRW或是RefRO代表"讀寫"或是"唯讀"
         //由於LocalTransform內的參數需要被改寫，所以使用RefRW；而RotateSpeed純粹只需要讀取裡面的參數，所以使用RefRO

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Entities;
@@ -8,6 +9,9 @@ using UnityEngine;
 //此腳本模擬玩家射出子彈的情況，因此新增PlayerShootingSystem腳本，使用partial class，並且繼承SystemBase
 public partial class PlayerShootingSystem : SystemBase
 {
+    //宣告一個OnShoot來當event EventHandler，讓PlayerShootManager腳本訂閱
+    public event EventHandler OnShoot;
+
     //確保只跑在Player tag component上
     protected override void OnCreate()
     {        
@@ -53,8 +57,9 @@ public partial class PlayerShootingSystem : SystemBase
         //像是這腳本要spawn一個cube entity，那就會沒有player component。而如果已經被生成的entity的type符合 SystemAPI.Query<RefRO<LocalTransform>>().WithAll<Player>()的話，就無法運作
         //所以應該用EntityCommandBuffer來生成Entity。        
         //*補充*要讓腳本判斷，玩家在不處於Stunned狀態，就必須再多寫WithDisabled<Stunned>()
+        //*補充* 補寫上WithEntityAccess()是為了篩選出誰才是需要射出物件的，前面也要跟著補上Entity entity當作Refrenece
         #endregion
-        foreach (RefRO<LocalTransform> localTramsform in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<Player>().WithDisabled<Stunned>())
+        foreach ((RefRO<LocalTransform> localTramsform, Entity entity)in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<Player>().WithDisabled<Stunned>().WithEntityAccess())
         {
             //entityCommandBuffer並沒有真的生成entity，而是新增一個command到command list表裡面，之後才會執行command list
             //呼叫entityCommandBuffer.SetComponent()，然後把spawnedEntity和LocalTransform當作輸入參數放進去            
@@ -65,6 +70,12 @@ public partial class PlayerShootingSystem : SystemBase
                 Rotation = quaternion.identity,
                 Scale = 1F
             });
+
+            //發送通知給訂閱者，注意把this換成entity
+            OnShoot?.Invoke(entity, EventArgs.Empty);
+
+            //PlayerShootManager用singleton的話，就能把位置參數localTramsform.ValueRO.Position放上去，然後直接呼叫PlayerShootManager的PlayerShoot來生成prefab
+            PlayerShootManager.Instance.PlayerShoot(localTramsform.ValueRO.Position);
         }
 
         //當佇列都設定好了，就可以執行command list。

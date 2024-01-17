@@ -18,6 +18,20 @@ public partial class PlayerShootingSystem : SystemBase
     //假設讓Cube當作子彈，然後用簡單的按鍵檢測玩家有沒有按空白鍵，如果玩家沒有按空白鍵就return
     protected override void OnUpdate()
     {
+
+        //當按下T、Y鍵，取得Player的Singleton，然後啟用playerEntity中stunned component的啟用和禁用
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            Entity playerEntity = SystemAPI.GetSingletonEntity<Player>();
+            EntityManager.SetComponentEnabled<Stunned>(playerEntity, true);
+        }
+        if (Input.GetKeyDown(KeyCode.Y))
+        {
+            Entity playerEntity = SystemAPI.GetSingletonEntity<Player>();
+            EntityManager.SetComponentEnabled<Stunned>(playerEntity, false);
+        }
+
+
         if (!Input.GetKeyDown(KeyCode.Space))
         {
             return;
@@ -38,8 +52,9 @@ public partial class PlayerShootingSystem : SystemBase
         //如果new prefab沒有match到 SystemAPI.Query<RefRO<LocalTransform>>().WithAll<Player>()的話，就能正常運行下面的程式碼。
         //像是這腳本要spawn一個cube entity，那就會沒有player component。而如果已經被生成的entity的type符合 SystemAPI.Query<RefRO<LocalTransform>>().WithAll<Player>()的話，就無法運作
         //所以應該用EntityCommandBuffer來生成Entity。        
+        //*補充*要讓腳本判斷，玩家在不處於Stunned狀態，就必須再多寫WithDisabled<Stunned>()
         #endregion
-        foreach (RefRO<LocalTransform> localTramsform in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<Player>())
+        foreach (RefRO<LocalTransform> localTramsform in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<Player>().WithDisabled<Stunned>())
         {
             //entityCommandBuffer並沒有真的生成entity，而是新增一個command到command list表裡面，之後才會執行command list
             //呼叫entityCommandBuffer.SetComponent()，然後把spawnedEntity和LocalTransform當作輸入參數放進去            
